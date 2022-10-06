@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "author": "denotarius-registry",
   "scripts": {
+    "lint": "eslint ./src/**/*.ts",
     "start:nssoudcz": "ts-node ./src/providers/nssoudcz/index.ts"
   },
   "dependencies": {
