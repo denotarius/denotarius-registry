@@ -5,9 +5,10 @@ import { v4 as uuidv4 } from 'uuid';
 import fs, { createWriteStream } from 'fs';
 import cliProgress from 'cli-progress';
 import config from './config.js';
-
 import colors from 'ansi-colors';
 import xlsx from 'xlsx';
+
+// download
 
 const downloadBar = new cliProgress.SingleBar({
   format: 'Downloading |' + colors.cyan('{bar}') + '| {percentage}%',
@@ -41,26 +42,26 @@ fileWriterStream
   })
   .on('finish', () => {
     downloadBar.stop();
-    processData();
     console.log(`File downloaded to ${fileName}`);
+    processData();
   });
 
 downloadStream.pipe(fileWriterStream);
 
-// read
+// process
 
 const processData = () => {
+  console.log('Processing the data ...');
   const workbook = xlsx.readFile(fileName);
   const sheet_name_list = workbook.SheetNames;
   const xlData = xlsx.utils.sheet_to_json<{ 'Spisová značka': string; uuid: string }>(
     workbook.Sheets[sheet_name_list[0]],
   );
 
-  const thingsToSearch: { id: string; searchString: string }[] = [];
+  const thingsToSearch: unknown[] = [];
 
   for (const row of xlData) {
-    const rowValue = row['Spisová značka'];
-    thingsToSearch.push({ id: uuidv4(), searchString: rowValue });
+    thingsToSearch.push({ ...row, id: uuidv4() });
   }
 
   fs.writeFile(
@@ -71,6 +72,7 @@ const processData = () => {
       if (error) {
         console.error(`Could not write file to system: ${error.message}`);
       }
+      console.log('OK');
     },
   );
 };
