@@ -1,7 +1,7 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import got from 'got';
-import { v4 as uuidv4 } from 'uuid';
+import { sha256 } from '../../utils.js';
 import fs, { createWriteStream } from 'fs';
 import cliProgress from 'cli-progress';
 import config from './config.js';
@@ -23,6 +23,7 @@ const __dirname = path.dirname(__filename);
 downloadBar.start(100, 0);
 
 const fileName = path.join(__dirname, '../../../data/nssoud.cz/nssoud.xlsx');
+const searchDataFileName = path.join(__dirname, '../../../data/nssoud.cz/serach-data.json');
 const downloadStream = got.stream(config.fileListUrl);
 const fileWriterStream = createWriteStream(fileName);
 
@@ -42,7 +43,7 @@ fileWriterStream
   })
   .on('finish', () => {
     downloadBar.stop();
-    console.log(`File downloaded to ${fileName}`);
+    console.log(`File downloaded to: ${fileName}`);
     processData();
   });
 
@@ -51,28 +52,31 @@ downloadStream.pipe(fileWriterStream);
 // process
 
 const processData = () => {
-  console.log('Processing the data ...');
-  const workbook = xlsx.readFile(fileName);
-  const sheet_name_list = workbook.SheetNames;
-  const xlData = xlsx.utils.sheet_to_json<{ 'Spisová značka': string; uuid: string }>(
-    workbook.Sheets[sheet_name_list[0]],
-  );
+  console.log('Processing the data...');
 
+  const workbook = xlsx.readFile(fileName);
+  const sheetNameList = workbook.SheetNames;
+  const xlData = xlsx.utils.sheet_to_json<Record<any, any>>(workbook.Sheets[sheetNameList[0]]);
   const thingsToSearch: unknown[] = [];
+  const filterResults = ['Nerozhodnuto'];
 
   for (const row of xlData) {
-    thingsToSearch.push({ ...row, id: uuidv4() });
+    const decision = row['Typ rozhodnutí'];
+
+    if (!filterResults.includes(decision)) {
+      const stringToHash = `${row['Spisová značka']}-${row['Soudce']}-${row['Typ věci']}-${row['Typ řízení']}-${row['Došlo']}}`;
+
+      thingsToSearch.push({
+        ...row,
+        hash: sha256(stringToHash),
+      });
+    }
   }
 
-  fs.writeFile(
-    path.join(__dirname, '../../../data/nssoud.cz/serach-data.json'),
-    JSON.stringify(thingsToSearch),
-    'utf8',
-    error => {
-      if (error) {
-        console.error(`Could not write file to system: ${error.message}`);
-      }
-      console.log('OK');
-    },
-  );
+  fs.writeFile(searchDataFileName, JSON.stringify(thingsToSearch), 'utf8', error => {
+    if (error) {
+      console.error(`Could not write file to system: ${error.message}`);
+    }
+    console.log(`File saved to: ${searchDataFileName}`);
+  });
 };
