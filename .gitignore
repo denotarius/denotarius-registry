@@ -104,3 +104,4 @@ dist
 .tern-port
 
 install-state.gz
+.DS_Store
