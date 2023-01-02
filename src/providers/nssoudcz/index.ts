@@ -23,7 +23,6 @@ const __dirname = path.dirname(__filename);
 downloadBar.start(100, 0);
 
 const fileName = path.join(__dirname, '../../../data/nssoud.cz/nssoud.xlsx');
-const searchDataFileName = path.join(__dirname, '../../../data/nssoud.cz/serach-data.json');
 const downloadStream = got.stream(config.fileListUrl);
 const fileWriterStream = createWriteStream(fileName);
 
@@ -52,6 +51,7 @@ downloadStream.pipe(fileWriterStream);
 // process
 
 const processData = () => {
+  const searchDataFileName = path.join(__dirname, '../../../data/nssoud.cz/serach-data.json');
   console.log('Processing the data...');
 
   const workbook = xlsx.readFile(fileName);
