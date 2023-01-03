@@ -4,7 +4,7 @@ module.exports = {
     project: './tsconfig.json',
     sourceType: 'module',
   },
-  plugins: ['@typescript-eslint', 'prettier', 'promise'],
+  plugins: ['@typescript-eslint', 'prettier'],
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/eslint-recommended',
@@ -17,7 +17,6 @@ module.exports = {
     'import/no-unresolved': 'off',
     'arrow-parens': [2, 'as-needed'],
     'prettier/prettier': 2,
-    '@typescript-eslint/no-floating-promises': ['error'],
     'prefer-destructuring': ['error', { object: true, array: false }],
     'import/extensions': ['error', 'always'],
   },

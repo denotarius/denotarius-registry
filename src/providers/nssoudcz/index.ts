@@ -1,82 +1,35 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
-import got from 'got';
-import { sha256 } from '../../utils.js';
-import fs, { createWriteStream } from 'fs';
-import cliProgress from 'cli-progress';
-import config from './config.js';
-import colors from 'ansi-colors';
-import xlsx from 'xlsx';
+import { fetchSourceFile } from './download.js';
+import { saveDataFromFile, createTables, getDBStatus } from './db.js';
+import { searchFilesByString } from './search.js';
+import { BLOCKFROST_IPFS } from './blockfrost.js';
 
-// download
+(async () => {
+  const dbStatus = await getDBStatus();
 
-const downloadBar = new cliProgress.SingleBar({
-  format: 'Downloading |' + colors.cyan('{bar}') + '| {percentage}%',
-  barCompleteChar: '\u2588',
-  barIncompleteChar: '\u2591',
-  hideCursor: true,
-});
+  createTables();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+  if (dbStatus === 'empty') {
+    const { fileName } = await fetchSourceFile();
+    await saveDataFromFile(fileName);
+  }
 
-downloadBar.start(100, 0);
+  const files = await searchFilesByString('Vol 13/2022');
 
-const fileName = path.join(__dirname, '../../../data/nssoud.cz/nssoud.xlsx');
-const downloadStream = got.stream(config.fileListUrl);
-const fileWriterStream = createWriteStream(fileName);
+  const filteredFiles = files.filter(file =>
+    file ? file.includes('/DokumentOriginal/Index/') : false,
+  );
 
-downloadStream
-  .on('downloadProgress', ({ percent }) => {
-    const percentage = Math.round(percent * 100);
-    downloadBar.update(percentage);
-  })
-  .on('error', error => {
-    downloadBar.stop();
-    console.error(`Download failed: ${error.message}`);
-  });
+  for await (const file of filteredFiles) {
+    if (file) {
+      // const fileUrl = new URL(file, 'https://vyhledavac.nssoud.cz').toString();
+      // const file = fs.createWriteStream(path.join('./', file));
 
-fileWriterStream
-  .on('error', error => {
-    console.error(`Could not write file to system: ${error.message}`);
-  })
-  .on('finish', () => {
-    downloadBar.stop();
-    console.log(`File downloaded to: ${fileName}`);
-    processData();
-  });
-
-downloadStream.pipe(fileWriterStream);
-
-// process
-
-const processData = () => {
-  const searchDataFileName = path.join(__dirname, '../../../data/nssoud.cz/serach-data.json');
-  console.log('Processing the data...');
-
-  const workbook = xlsx.readFile(fileName);
-  const sheetNameList = workbook.SheetNames;
-  const xlData = xlsx.utils.sheet_to_json<Record<any, any>>(workbook.Sheets[sheetNameList[0]]);
-  const thingsToSearch: unknown[] = [];
-  const filterResults = ['Nerozhodnuto'];
-
-  for (const row of xlData) {
-    const decision = row['Typ rozhodnutí'];
-
-    if (!filterResults.includes(decision)) {
-      const stringToHash = `${row['Spisová značka']}-${row['Soudce']}-${row['Typ věci']}-${row['Typ řízení']}-${row['Došlo']}}`;
-
-      thingsToSearch.push({
-        ...row,
-        hash: sha256(stringToHash),
-      });
+      const ipfsHash = await BLOCKFROST_IPFS.add(
+        './providers/nssoudcz/15Af 120-2017_20210317120059.pdf',
+      );
+      console.log('ipfsHash', ipfsHash);
     }
   }
 
-  fs.writeFile(searchDataFileName, JSON.stringify(thingsToSearch), 'utf8', error => {
-    if (error) {
-      console.error(`Could not write file to system: ${error.message}`);
-    }
-    console.log(`File saved to: ${searchDataFileName}`);
-  });
-};
+  console.log('Done');
+})();
