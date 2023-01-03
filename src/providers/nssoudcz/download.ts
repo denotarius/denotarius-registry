@@ -2,10 +2,13 @@ import colors from 'ansi-colors';
 import cliProgress from 'cli-progress';
 import { createWriteStream } from 'fs';
 import got from 'got';
+import download from 'download';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 import config from './config.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const downloadBar = new cliProgress.SingleBar({
   format: 'Downloading |' + colors.cyan('{bar}') + '| {percentage}%',
@@ -16,9 +19,6 @@ const downloadBar = new cliProgress.SingleBar({
 
 export const fetchSourceFile = (): Promise<{ fileName: string }> =>
   new Promise((resolve, reject): void => {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-
     downloadBar.start(100, 0);
 
     const fileName = path.join(__dirname, '../../../data/nssoud.cz/nssoud.xlsx');
@@ -47,3 +47,9 @@ export const fetchSourceFile = (): Promise<{ fileName: string }> =>
 
     downloadStream.pipe(fileWriterStream);
   });
+
+export const saveDocuments = async (fileList: string[]) => {
+  await Promise.all(
+    fileList.map(url => download(url, path.join(__dirname, '../../../data/documents'))),
+  );
+};

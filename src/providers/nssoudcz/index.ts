@@ -1,7 +1,13 @@
-import { fetchSourceFile } from './download.js';
-import { saveDataFromFile, createTables, getDBStatus } from './db.js';
+import { fetchSourceFile, saveDocuments } from './download.js';
+import { saveDataFromFile, createTables, getDBStatus, getItems } from './db.js';
 import { searchFilesByString } from './search.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { BLOCKFROST_IPFS } from './blockfrost.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 (async () => {
   const dbStatus = await getDBStatus();
@@ -13,22 +19,39 @@ import { BLOCKFROST_IPFS } from './blockfrost.js';
     await saveDataFromFile(fileName);
   }
 
-  const files = await searchFilesByString('Vol 13/2022');
+  const itemsToPersist = await getItems();
 
-  const filteredFiles = files.filter(file =>
-    file ? file.includes('/DokumentOriginal/Index/') : false,
-  );
+  for (const i of itemsToPersist) {
+    //@ts-expect-error later
+    const files = await searchFilesByString(i.spisova_znacka);
 
-  for await (const file of filteredFiles) {
-    if (file) {
-      // const fileUrl = new URL(file, 'https://vyhledavac.nssoud.cz').toString();
-      // const file = fs.createWriteStream(path.join('./', file));
+    const filteredFiles = files.filter(file =>
+      file ? file.includes('/DokumentOriginal/Index/') : false,
+    );
 
-      const ipfsHash = await BLOCKFROST_IPFS.add(
-        './providers/nssoudcz/15Af 120-2017_20210317120059.pdf',
-      );
-      console.log('ipfsHash', ipfsHash);
+    const filesToDownload = [];
+
+    for await (const file of filteredFiles) {
+      if (file) {
+        const fileUrl = new URL(file, 'https://vyhledavac.nssoud.cz').toString();
+        filesToDownload.push(fileUrl);
+      }
     }
+
+    await saveDocuments(filesToDownload);
+    const documentsFolder = path.join(__dirname, '../../../data/documents/');
+
+    fs.readdir(documentsFolder, async (err, files) => {
+      if (err) console.log(err);
+
+      for await (const file of files) {
+        const filePath = path.join(__dirname, '../../../data/documents/', file);
+        const ipfsData = await BLOCKFROST_IPFS.add(filePath);
+        // @ts-expect-error later
+        // send this to denotarius
+        console.log({ ...i, ...ipfsData });
+      }
+    });
   }
 
   console.log('Done');

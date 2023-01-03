@@ -16,6 +16,17 @@ export const getDBStatus = async (): Promise<'ok' | 'empty'> => {
   });
 };
 
+export const getItems = async (): Promise<unknown[]> => {
+  return new Promise((resolve, reject) => {
+    db.all('SELECT * FROM justice_decisions limit 10', (error, result) => {
+      if (error) {
+        reject(error);
+      }
+      resolve(result);
+    });
+  });
+};
+
 export const createTables = async () => {
   const createTableJustice = () =>
     new Promise((resolve, reject) => {
