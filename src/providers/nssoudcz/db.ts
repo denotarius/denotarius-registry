@@ -47,10 +47,9 @@ export const createTables = async () => {
     new Promise((resolve, reject) => {
       db.run(
         `CREATE TABLE IF NOT EXISTS 
-          documents(
+          queue(
             hash TEXT UNIQUE,
-            name TEXT,
-            ipfs_hash TEXT,
+            state TEXT,
             transaction_hash TEXT,
             FOREIGN KEY(hash) REFERENCES justice_decisions(hash)
           )`,
@@ -106,4 +105,22 @@ export const saveDataFromFile = async (fileName: string) => {
   }
 
   statement.finalize();
+};
+
+interface Input {
+  hash: string;
+  state: 'ok' | 'error';
+  txHash: string;
+}
+
+export const saveQueueItem = async (input: Input) => {
+  db.run(
+    `INSERT INTO queue(hash, state, transaction_hash) VALUES(?, ?, ?)`,
+    [input.hash, input.state, input.txHash],
+    err => {
+      if (err) {
+        return console.log(err.message);
+      }
+    },
+  );
 };
