@@ -9,6 +9,7 @@
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "cSpell.words": [
     "blockfrost",
+    "cardano",
     "denotarius",
     "Dokument",
     "Došlo",

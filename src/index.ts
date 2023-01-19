@@ -1,12 +1,13 @@
-import { fetchSourceFile, saveDocuments } from './download.js';
-import { saveDataFromFile, createTables, getDBStatus, getItems } from './db.js';
-import { searchFilesByString } from './search.js';
-import path from 'path';
 import fs from 'fs';
-import { Lucid, Blockfrost } from 'lucid-cardano';
-import { fileURLToPath } from 'url';
-import { BLOCKFROST_IPFS } from './blockfrost.js';
 import got from 'got';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+import { BLOCKFROST_IPFS, lucid } from './utils.js';
+import { createTables, getDBStatus, getItems, saveDataFromFile, saveQueueItem } from './db.js';
+import { fetchSourceFile, saveDocuments } from './download.js';
+import { RequestBody } from './types.js';
+import { searchFilesByString } from './search.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,13 +15,6 @@ const __dirname = path.dirname(__filename);
 (async () => {
   try {
     const dbStatus = await getDBStatus();
-    const lucid = await Lucid.new(
-      new Blockfrost(
-        'https://cardano-preview.blockfrost.io/api/v0',
-        'previewS3XpcDGrTMYUNFOhJPeSos2RRAkNW5XN',
-      ),
-      'Preview',
-    );
 
     const seedPhrase = 'all all all all all all all all all all all all';
     lucid.selectWalletFromSeed(seedPhrase);
@@ -33,12 +27,10 @@ const __dirname = path.dirname(__filename);
     }
 
     const itemsToPersist = await getItems();
-    const result: Record<any, any> = {};
-    const bodyToSend: any = { ipfs: [], pin_ipfs: true };
+    const bodyToSend: RequestBody = { ipfs: [], pin_ipfs: true };
 
     for (const i of itemsToPersist) {
-      //@ts-expect-error later
-      const files = await searchFilesByString(i.spisova_znacka);
+      const files = await searchFilesByString(i.nsssoud_spisova_znacka);
 
       const filteredFiles = files.filter(file =>
         file ? file.includes('/DokumentOriginal/Index/') : false,
@@ -56,9 +48,6 @@ const __dirname = path.dirname(__filename);
       await saveDocuments(filesToDownload);
       const documentsFolder = path.join(__dirname, '../../../data/documents/');
 
-      // @ts-expect-error later
-      result[i.hash] = [];
-
       fs.readdir(documentsFolder, async (err, files) => {
         if (err) console.log(err);
 
@@ -68,33 +57,41 @@ const __dirname = path.dirname(__filename);
 
           bodyToSend.ipfs.push({
             cid: ipfsData.ipfs_hash,
-            metadata: {
-              // @ts-expect-error later
-              nsssoud_spisova_znacka: i.nsssoud_spisova_znacka,
-            },
+            metadata: [
+              i.nsssoud_spisova_znacka,
+              i.nsssoud_soudce,
+              i.nsssoud_typ_veci,
+              i.nsssoud_typ_rizeni,
+              i.nsssoud_doslo,
+            ],
           });
         }
       });
 
       if (bodyToSend.ipfs.length > 0) {
-        const response: any = await got
-          .post('http://0.0.0.0:3000/attestation/submit', {
-            body: JSON.stringify(bodyToSend),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          })
-          .json();
+        const body = JSON.stringify(bodyToSend);
+        try {
+          const response: { payment: { address: string } } = await got
+            .post('http://0.0.0.0:3000/attestation/submit', {
+              body,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            })
+            .json();
 
-        const tx = await lucid
-          .newTx()
-          .payToAddress(response.payment.address, { lovelace: 10000000n })
-          .complete();
+          const tx = await lucid
+            .newTx()
+            .payToAddress(response.payment.address, { lovelace: 10000000n })
+            .complete();
 
-        const signedTx = await tx.sign().complete();
-        const txHash = await signedTx.submit();
+          const signedTx = await tx.sign().complete();
+          const txHash = await signedTx.submit();
 
-        console.log(response, txHash);
+          await saveQueueItem({ hash: i.hash, state: 'ok', txHash });
+        } catch (e) {
+          await saveQueueItem({ hash: i.hash, state: 'error' });
+        }
       }
     }
 

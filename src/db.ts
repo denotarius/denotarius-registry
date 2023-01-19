@@ -1,11 +1,11 @@
 import xlsx from 'xlsx';
 import sqlite3 from 'sqlite3';
-
-import { sha256 } from '../../utils.js';
+import { DBJusticeDecisionRow, DBQueueRowInput, DBStatusResponse } from './types.js';
+import { sha256 } from './utils.js';
 
 export const db = new sqlite3.Database('./database.db');
 
-export const getDBStatus = async (): Promise<'ok' | 'empty'> => {
+export const getDBStatus = async (): Promise<DBStatusResponse> => {
   return new Promise((resolve, reject) => {
     db.get('SELECT count(*) as count FROM justice_decisions', (error, result) => {
       if (error) {
@@ -16,9 +16,9 @@ export const getDBStatus = async (): Promise<'ok' | 'empty'> => {
   });
 };
 
-export const getItems = async (): Promise<unknown[]> => {
+export const getItems = async (): Promise<DBJusticeDecisionRow[]> => {
   return new Promise((resolve, reject) => {
-    db.all('SELECT * FROM justice_decisions limit 10', (error, result) => {
+    db.all('SELECT * FROM justice_decisions ORDER BY random() limit 5', (error, result) => {
       if (error) {
         reject(error);
       }
@@ -64,7 +64,7 @@ export const createTables = async () => {
 export const saveDataFromFile = async (fileName: string) => {
   const workbook = xlsx.readFile(fileName);
   const sheetNameList = workbook.SheetNames;
-  const xlData = xlsx.utils.sheet_to_json<Record<any, any>>(workbook.Sheets[sheetNameList[0]]);
+  const xlData = xlsx.utils.sheet_to_json<Record<string, never>>(workbook.Sheets[sheetNameList[0]]);
   const thingsToSearch: unknown[] = [];
   const filterResults = ['Nerozhodnuto'];
 
@@ -107,13 +107,7 @@ export const saveDataFromFile = async (fileName: string) => {
   statement.finalize();
 };
 
-interface Input {
-  hash: string;
-  state: 'ok' | 'error';
-  txHash: string;
-}
-
-export const saveQueueItem = async (input: Input) => {
+export const saveQueueItem = async (input: DBQueueRowInput) => {
   db.run(
     `INSERT INTO queue(hash, state, transaction_hash) VALUES(?, ?, ?)`,
     [input.hash, input.state, input.txHash],

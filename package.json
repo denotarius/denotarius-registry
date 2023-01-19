@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint ./src/**/*.ts",
-    "start:nssoudcz": "ts-node-esm ./src/providers/nssoudcz/index.ts"
+    "start": "ts-node-esm ./src/index.ts"
   },
   "dependencies": {
     "@blockfrost/blockfrost-js": "5.0.0",

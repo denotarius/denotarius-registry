@@ -5,8 +5,6 @@ import got from 'got';
 import download from 'download';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-import config from './config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -22,7 +20,9 @@ export const fetchSourceFile = (): Promise<{ fileName: string }> =>
     downloadBar.start(100, 0);
 
     const fileName = path.join(__dirname, '../../../data/nssoud.cz/nssoud.xlsx');
-    const downloadStream = got.stream(config.xmlSourceFile);
+    const downloadStream = got.stream(
+      'https://www.nssoud.cz/fileadmin/user_upload/dokumenty/Otevrena_data/soudni_cinnosti_od_2003_12.xlsx',
+    );
     const fileWriterStream = createWriteStream(fileName);
 
     downloadStream
